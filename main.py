@@ -181,6 +181,26 @@ class pTransition:
 		self.NConstant = I
 	def __call__(self,x):
 		return np.exp(-2*self.Jt_spline(x))/self.NConstant
+"""
+Version of pTransition using the more stable
+JIntegrator
+"""
+from JIntegrator import JIntegrator, integrator_pars
+class pTransition2:
+	def __init__(self,HObj,integrator_pars):
+		self.HJacobi_integrator = JIntegrator(HObj,integrator_pars)
+	def make(self,x0,T,tsteps=0.1,parInt=None):
+		# Form the initial interval around x0
+		self.HJacobi_integrator.intPar.construct_xx(x0)
+		# Initialise tsteps
+		tt = np.arrange(0.,T,tsteps)
+		# Initial steep quadratic
+		def J0f(x):
+			return 100*(x-x0)**2
+		j0 = J0f(Self.HJacobi_integrator.intPar.xx)
+		Jt = self.HJacobi_integrator(j0,tt)
+		return Jt
+
 
 """
 
