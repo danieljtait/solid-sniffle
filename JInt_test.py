@@ -35,3 +35,7 @@ if type(z) == np.ndarray:
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.plot(Jint.intPar.xx,np.exp(-2*z))
+    
+from main import pTransition2
+
+pT = pTransition2(H,parInt)
