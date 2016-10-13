@@ -41,10 +41,18 @@ class Hamiltonian:
 	def __init__(self,potentialObj,D2):
 		self.D1 = lambda x : -1*potentialObj.grad(x)
 		self.D2 = D2
+		self.add_term = False
 	def __call__(self,x,p):
-		return 0.5*self.D2(x)*p**2 + p*self.D1(x)
+		addVal = 0.
+		if self.add_term:
+			addVal = self.add_term_ev(x,p)
+		return 0.5*self.D2(x)*p**2 + p*self.D1(x) + addVal
 	def seperatrix(self,x):
 		return -2*self.D1(x)/self.D2(x)
+	def set_add_term(self,func):
+		self.add_term = True
+		self.add_term_ev = func
+
 
 class pStationary:
 	def __init__(self,HamiltonianObj):
@@ -64,7 +72,7 @@ class pStationary:
 
 class HJacobi_integrator:
 	def __init__(self,HamiltonianObj,pStat=None):
-		self.H = H 
+		self.H = HamiltonianObj
 		self.mesh_set = False
 		self.pStat = pStat
 	"""
@@ -97,7 +105,7 @@ class HJacobi_integrator:
 		p = (1.-w)*dJdx + w*self.homotopeTarget
 		return -self.H(self.xx,p)
 	def __call__(self,tt,J0f,method="ordinary"):
-		self.set_mesh([-1.5,1.5],300)
+		self.set_mesh([-1.5,1.5],500)
 		if method == "ordinary":
 			j0 = J0f(self.xx)
 			sol = odeint(self.dJdt,j0,tt)
@@ -111,13 +119,14 @@ class HJacobi_integrator:
 			sol = odeint(self.dJdt_cflowhomotope,j0,tt)
 			return sol[-1,]
 		elif method == "cflow2":
-			fig = plt.figure()
+			#fig = plt.figure()
 			ax = fig.add_subplot(111)
-			wfunc = util_cflowhomotope(1.5)
+			#wfunc = util_cflowhomotope(.1)
+			wfunc = util_cflowhomotope_2(.7)
 			j0 = J0f(self.xx)
 			T = tt[-1]
 			N = tt.size
-			NSteps = 5
+			NSteps = 2
 			delT = T/NSteps
 			tcur = 0.
 			Jcur = j0.copy()
@@ -146,6 +155,37 @@ def util_cflowhomotope(rho=1.):
 		return 2*(1./(1.+np.exp(-rho*t)) - 0.5)
 	return w
 
+def util_cflowhomotope_2(m):
+	def w(t) :
+		if t < 1./m :
+			return m*t 
+		else :
+			return 1.
+	return w
+
+"""
+The whole sample will have one shared instance of 
+HJacobi_integrator built with one H, and we then construct
+pTransition
+"""
+from scipy.interpolate import UnivariateSpline
+class pTransition:
+	def __init__(self,HJacobi_integrator):
+		self.HJacobi_integrator = HJacobi_integrator
+	def make(self,x0,tt):
+		def J0f(x):
+			return 100*(x-x0)**2 
+		Jt = self.HJacobi_integrator(tt,J0f,"ordinary")
+		self.Jt_spline = UnivariateSpline(self.HJacobi_integrator.xx,Jt,s=0.1)
+		I,err = quad(lambda x: np.exp(-2*self.Jt_spline(x)),-np.inf,np.inf)
+		self.NConstant = I
+	def __call__(self,x):
+		return np.exp(-2*self.Jt_spline(x))/self.NConstant
+
+"""
+
+import copy
+#Hnew = copy.deepcopy(H)
 
 import matplotlib.pyplot as plt 
 
@@ -176,10 +216,12 @@ ans,err = quad(lambda x: Pst(x) , -np.inf,np.inf)
 print ans
 
 w = util_cflowhomotope(3.)
+w2 = util_cflowhomotope_2(0.1)
 fig4 = plt.figure()
 ax = fig4.add_subplot(111)
-tt = np.linspace(0.,10.,1000)
+tt = np.linspace(0.,15.,1000)
 ax.plot(tt,w(tt))
+ax.plot(tt,[w2(t) for t in tt])
 
 """
 
@@ -188,7 +230,7 @@ ax.plot(tt,w(tt))
 fig5 = plt.figure()
 ax = fig5.add_subplot(111)
 def J0f(x):
-	C = 30.
+	C = 100.
 	return C*(x-0.3)**2
 J = HJacobi_integrator(H,Pst)
 tt = np.linspace(0.,.5,200)
@@ -212,20 +254,56 @@ class Diffusion:
 			w = self.H.D2(S[-1])*norm.rvs(scale=root_delT)
 			S.append( S[-1] + self.H.D1(S[-1])*delT + w )
 		return np.array(S)
-	def EstMoments(self,x0,T,nSim=50,n=100):
+	def EstMoments(self,x0,T,nSim=50,n=100,withMix=False):
+		np.random.seed(11)
 		X = np.zeros(nSim)
 		for i in range(nSim) :
 			s = self.sim(x0,T,n)
 			X[i] = s[-1]
-		return np.mean(X),np.var(X)
+		if withMix :
+			from sklearn import mixture
+			clf = mixture.GaussianMixture(n_components=2,covariance_type='full')
+			clf.fit(X.reshape(nSim,1))
+			return np.mean(X),np.var(X),clf
+		else :
+			return np.mean(X),np.var(X)
 
+
+T = 0.62
+x0 = 0.3
+
+pT = pTransition(J)
+pT.make(x0,T)
 
 
 dX = Diffusion(H)
-s = dX.sim(0.3,.5,100)
+s = dX.sim(x0,T,100)
 fig6 = plt.figure()
 ax = fig6.add_subplot(111)
-ax.plot(np.linspace(0.,0.5,100),s)
+ax.plot(np.linspace(0.,T,100),s)
 
-print dX.EstMoments(0.3,.5,100,200)
+mu,var,clf = dX.EstMoments(x0,T,100,200,True)
+print clf.means_
+print clf.covariances_
+
+fig7 = plt.figure()
+ax = fig7.add_subplot(111)
+
+from scipy.stats import multivariate_normal
+def mixpdf(xx,clf) :
+	val = 0.
+	for i,w in enumerate(clf.weights_):
+		val += w*multivariate_normal.pdf(xx,clf.means_[i],clf.covariances_[i])
+	return val
+
+xx = np.linspace(-1.5,1.5,100)
+ax.plot(xx,pT(xx))
+ax.plot(xx,mixpdf(xx,clf))
+
+Mu,_ = quad(lambda x: x*pT(x), -np.inf,np.inf)
+Var,_ = quad(lambda x: pT(x)*(x-Mu)**2, - np.inf,np.inf)
+
+print Mu,Var
+
 plt.show()
+"""
