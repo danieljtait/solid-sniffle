@@ -188,19 +188,30 @@ JIntegrator
 from JIntegrator import JIntegrator, integrator_pars
 class pTransition2:
 	def __init__(self,HObj,integrator_pars):
-		self.HJacobi_integrator = JIntegrator(HObj,integrator_pars)
+		self.HJacobi_integrator = JIntegrator(integrator_pars,HObj)
+		self.is_made = False
 	def make(self,x0,T,tsteps=0.1,parInt=None):
 		# Form the initial interval around x0
 		self.HJacobi_integrator.intPar.construct_xx(x0)
 		# Initialise tsteps
-		tt = np.arrange(0.,T,tsteps)
+		tt = np.arange(0.,T,tsteps)
 		# Initial steep quadratic
 		def J0f(x):
 			return 100*(x-x0)**2
-		j0 = J0f(Self.HJacobi_integrator.intPar.xx)
+		j0 = J0f(self.HJacobi_integrator.intPar.xx)
 		Jt = self.HJacobi_integrator(j0,tt)
-		return Jt
-
+		if type(Jt) == np.ndarray:
+			js = UnivariateSpline(self.HJacobi_integrator.intPar.xx,Jt,s=0.1)
+			self.js = js
+			self.is_made = True
+			I,err = quad(lambda x:np.exp(-js(x)/self.HJacobi_integrator.H.D2(x)),-1.5,1.5)
+			self.NConstant = I
+	def __call__(self,x):
+		if self.is_made:
+			return np.exp(-self.js(x)/self.HJacobi_integrator.H.D2(x))/self.NConstant
+		else:
+			print "Must call .make(x0,T) first."
+			return None
 
 """
 

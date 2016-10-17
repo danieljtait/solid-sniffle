@@ -17,7 +17,7 @@ class integrator_pars:
 		self.dxTarget=dxTarget #
 		self.N_max = N_max
 		self.ptol=ptol
-		self.maxChanges = 5
+		self.maxChanges = 10
 		self.c = 0.3
 		self.XLIM = [-1.5,1.5]
 	def construct_xx(self,c):
@@ -42,10 +42,10 @@ def update_integrator_pars(changes,parIntObj):
 def cond(Jt,integrator_parsObj):
 	zL = np.exp(-2*Jt[0])
 	zR = np.exp(-2*Jt[-1])
-	print "------------------"
-	print integrator_parsObj.dx
-	print integrator_parsObj.xx[0], integrator_parsObj.xx[-1]
-	print zL,zR
+	#print "------------------"
+	#print integrator_parsObj.dx
+	#print integrator_parsObj.xx[0], integrator_parsObj.xx[-1]
+	#print zL,zR
 	lChange = None
 	rChange = None
 	noChange = True
@@ -94,19 +94,24 @@ class JIntegrator:
 	def adaptive_step(self,J0,ttSmall):
 		nt = 0
 		SUCCESS = False
-		import matplotlib.pyplot as plt 
+#		import matplotlib.pyplot as plt 
 		while nt < self.intPar.maxChanges:
+			#print "nt is ",nt
 			# Try integrator
-			fig = plt.figure()
-			ax = fig.add_subplot(111)
-			sol = odeint(self.dJdt,J0,ttSmall)[-1,]
-			ax.plot(self.intPar.xx,J0,'bo')
-			ax.plot(self.intPar.xx,sol,'r-')
+#			fig = plt.figure()
+#			ax = fig.add_subplot(111)
+			sol,infodict = odeint(self.dJdt,J0,ttSmall,printmessg=1,full_output=True)
+			nst = infodict['nst']
+			if nst[3] > 1e5 :
+				print "Something has gone really wrong"
+			sol = sol[-1,]
+#			ax.plot(self.intPar.xx,J0,'bo')
+#			ax.plot(self.intPar.xx,sol,'r-')
 
 			changes,noChange = cond(sol,self.intPar)
 			# Pass solution to condition checker
 			if noChange and abs(sol).max() < 1e100:
-				print "Took ",nt,"iterations."
+				#print "Took ",nt,"iterations."
 				return sol 				
 			else :
 				# Construct the extrapolator of init cond
@@ -116,7 +121,7 @@ class JIntegrator:
 				update_integrator_pars(changes,self.intPar)
 				self.intPar.construct_xx(self.intPar.c)
 				J0 = jfunc(self.intPar.xx)
-				ax.plot(self.intPar.xx,J0,'g+')
+#				ax.plot(self.intPar.xx,J0,'g+')
 			nt += 1
 		if not SUCCESS:
 			print "Error: Failed to provide stable solution."

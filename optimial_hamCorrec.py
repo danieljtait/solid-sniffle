@@ -1,7 +1,7 @@
 import numpy as np 
 import matplotlib.pyplot as plt 
 from main import init_dbw_example,potential,Hamiltonian,pStationary,HJacobi_integrator
-from main import pTransition
+from main import pTransition, pTransition2
 from scipy.interpolate import UnivariateSpline
 
 from scipy.stats import norm
@@ -148,8 +148,5 @@ ax.set_xlim((0,T+scale*q.max()+0.1))
 
 ax.set_xlabel("Time")
 ax.set_ylabel("X_T")
-
-# Save data
-np.savetxt("dbwData1.txt",R[1,],delimiter=",")
 
 plt.show()

@@ -5,11 +5,11 @@ Created on Thu Oct 13 09:50:58 2016
 @author: danieltait
 """
 
-from Jintegrator import *
+from JIntegrator import *
 
 delta = [0.25,0.25]
 scale = 1.5
-dxTarg = 0.01
+dxTarg = 0.001
 
 parInt = integrator_pars(delta,scale,dxTarg)
 parInt.construct_xx(0.3)
@@ -39,3 +39,10 @@ if type(z) == np.ndarray:
 from main import pTransition2
 
 pT = pTransition2(H,parInt)
+pT.make(0.3,0.5)
+
+fig = plt.figure()
+ax = fig.add_subplot(111)
+
+xx = np.linspace(-1.5,1.5,100)
+ax.plot(xx,pT(xx))
